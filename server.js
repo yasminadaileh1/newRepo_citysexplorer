@@ -1,112 +1,94 @@
+// steps to start the server ..
 require('dotenv').config();
 const express = require('express');
-// create our app 
-// expose the prototype that will get set on requests
-// expose the prototype that will get set on responses
-
+const app = express();
+const PORT = process.env.PORT || 4000;
 const cors = require('cors');
-// cors origin source sharing
-
+app.use(cors());
 const superagent = require('superagent');
 
-const PORT = process.env.PORT || 4000;
-// we write it in the .env file also an alternative for it in case the server shutdown.
-
-const app = express();
-// app.handle (req, res, next);
-
-app.use(cors());
-app.get('/location', locationHandler);
-app.get('/weather', weatherHandler);
-app.get('/trails',trailHandler);
-app.use(errorHandler);
-
-function locationHandler(request, response) {
- const city = request.query.city;
-  superagent(
-    `https://eu1.locationiq.com/v1/search.php?key=${process.env.GEOCODE_API_KEY}&q=${city}&format=json`
-    // console.log(GEOCODE_API_KEY)
-  )
-  .then((res) => {
-      const geoData = res.body;
-      const locationData = new Location(city, geoData);
-    //   console.log(locationData)
-      response.status(200).json(locationData);
-    })
-    .catch((error) => errorHandler(error, request, response));
-}
-
-function weatherHandler(request, response) { 
-  
-     superagent(
-       `https://api.weatherbit.io/v2.0/forecast/daily?city=${request.query.search_query}&key=${process.env.WEATHER_API_KEY}`
-       
-     )
-     .then((weatherApi) => {
-        console.log(weatherApi);
-        const weatherNow = weatherApi.body.data.map((weatherData) => {
-          return new Weather(weatherData);
-        //   console.log(weatherNow);
-        });
-        response.status(200).json(weatherNow);
-      })
-      .catch((error) => errorHandler(error, request, response));
-  }
-  function trailHandler (request , response){
-    const latitude = request.query.latitude;
-    const longitude = request.query.longitude;
-    superagent(
-      `https://www.hikingproject.com/data/get-trails?lat=${latitude}&lon=${longitude}&maxResult=10${process.env.TRAIL_API_KEY}`
-    )
-    .then((res) => {
-      const newTrail = res.body.trails.map((res)=>{
-        return new Trail(res);
-      });
-      response.status(200).json(newTrail);
-    }
-    )
-  }
-
-
-function Location ( city , geoData){
+// constructors ..
+function Location(city, geoData) {
     this.search_query = city;
     this.formatted_query = geoData[0].display_name;
     this.latitude = geoData[0].lat;
     this.longitude = geoData[0].lon;
 }
-function Weather (weatherData){
-    this.forecast = weatherData.weather.description ;
-    this.datetime = new Date(weatherData.valid_date).toDateString()
-}
-// {
-//   "name": "Rattlesnake Ledge",
-//   "location": "Riverbend, Washington",
-//   "length": "4.3",
-//   "stars": "4.4",
-//   "star_votes": "84",
-//   "summary": "An extremely popular out-and-back hike to the viewpoint on Rattlesnake Ledge.",
-//   "trail_url": "https://www.hikingproject.com/trail/7021679/rattlesnake-ledge",
-//   "conditions": "Dry: The trail is clearly marked and well maintained.",
-//   "condition_date": "2018-07-21",
-//   "condition_time": "0:00:00 "
-// },
-function Trail ( trialData){
-  this.name = trialData.name;
-  this.location = trialData.location;
-  this.lengh = trialData.lengh;
-  this.stars = trialData.stars;
-  this.star_votes = trialData.star_votes;
-  this.summary = trialData.summary;
-  this.trail_url = trialData.trail_url;
-  this.conditions =trialData.conditions;
-  this.condition_date = trialData.condition_date;
-  this.condition_time = trialData.condition_time;
+
+function Weather(weatherData) {
+    this.forecast = weatherData.weather.description;
+    this.datetime = new Date(weatherData.valid_date).toString().slice(4, 15);
 }
 
+function Trail(trail) {
+    this.name = trail.name;
+    this.location = trail.location;
+    this.length = trail.length;
+    this.stars = trail.stars;
+    this.star_votes = trail.starVotes;
+    this.summary = trail.summary;
+    this.trail_url = trail.url;
+    this.condition_time = trail.conditionDate.slice(11); 
+    this.condition_date = trail.conditionDate.slice(0, 10);
+}
+// now we will git the data from the API :
+// we need to differentiate between two type of the request .. we have a request from the client to the server
+// and request from the server to the 3rd part that will provied us with the data ..
+app.get('/location', (request, response) => {
+    const city = request.query.city;
+    // console.log(`hello our ${city}`);
+    // this console will give us undefine until we identify our city with the request..
+
+    // to be sure if it works:
+    // console.log('hello') it give us in the terminal hello ! which mean thing is good until NOW :)
+    // we need to get the data from other sources and for this we need the API and super agent 
+    superagent(`https://eu1.locationiq.com/v1/search.php?key=${process.env.GEOCODE_API_KEY}&q=${city}&format=json`)
+        // now after that we need the THEN order ( we catch the data , then ?)
+        .then((res) => {
+            const geoData = res.body;
+            // console.log(`geoData is our ${geoData}`)
+            // before specifing which city we want we have an array whit 6 object so I think its the data for the six cities that we have.
+            // after selecting the city we will see array of 10 object and I think its the properties that we have for each city.
+
+            const locationData = new Location(city, geoData);
+            // console.log(`this is our new object ${locationData}`);
+
+            response.status(200).json(locationData);
+        })
+        .catch((error) => errorHandler(error, request, response));
+});
+
+app.get('/weather', (request, response) => {
+    const city = request.query.search_query;
+    // console.log(` this is our ${city}`) so to reach to the city we need to define the search query for it.
+    superagent(`https://api.weatherbit.io/v2.0/forecast/daily?city=${city}&key=${process.env.WEATHER_API_KEY}`)
+        .then((res) => {
+            const weatherNow = res.body.data.map((weatherData) => {
+                return new Weather(weatherData)
+                // I notes that if we write in the local host weather without entering any city the map with broken because we are using the method without having any data!
+            });
+            response.status(200).json(weatherNow)
+        })
+        .catch((error) => errorHandler(error, request, response));
+});
+
+app.get('/trails', (request, response) => {
+    // const latitudeSearch = request.query.latitude
+    // const longitudeSearch = request.query.longitude
+    superagent(`https://www.hikingproject.com/data/get-trails?lat=${request.query.latitude}&lon=${request.query.longitude}&maxResult=10&key=${process.env.TRAIL_API_KEY}`)
+        // console.log(`hello ${latitude} and ${longitude}`)
+        .then((res) => {
+            const trialData = res.body.trails.map((ourTrail) => {
+                return new Trail(ourTrail);
+            });
+            response.status(200).json(trialData)
+        })
+        .catch((error) => errorHandler(error, request, response));
+});
 
 function errorHandler(error, request, response) {
     response.status(500).send(error);
-  }
+}
 app.use('*', (request, response) => response.status(404).send('404 page not found'));
 
 
