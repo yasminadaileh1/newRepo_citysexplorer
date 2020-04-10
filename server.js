@@ -17,7 +17,7 @@ function Location(city, geoData) {
 
 function Weather(weatherData) {
     this.forecast = weatherData.weather.description;
-    this.datetime = new Date(weatherData.valid_date).toString().slice(4, 15);
+    this.datetime = new Date(weatherData.valid_date).toString().slice(0, 15);
 }
 
 function Trail(trail) {
